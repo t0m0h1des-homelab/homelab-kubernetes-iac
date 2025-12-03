@@ -107,12 +107,14 @@
         gpgkey: "https://pkgs.k8s.io/core:/stable:/v{{ k8s_version }}/rpm/repodata/repomd.xml.key"
         enabled: yes
 
-    - name: Install Kube tools
+    - name: Install Kube tools and Helm dependencies
       ansible.builtin.dnf:
         name:
-          - "kubelet"
-          - "kubeadm"
-          - "kubectl"
+          - kubelet
+          - kubeadm
+          - kubectl
+          - helm
+          - python3-kubernetes
         state: present
 
     - name: Enable Kubelet
@@ -180,3 +182,21 @@
       failed_when:
         - "'not found' not in taint_result.stderr"
         - "taint_result.rc != 0"
+
+    - name: Add ArgoCD Helm Repo
+      kubernetes.core.helm_repository:
+        name: argo
+        repo_url: "https://argoproj.github.io/argo-helm"
+
+    - name: Install ArgoCD via Helm
+      kubernetes.core.helm:
+        name: argocd
+        chart_ref: argo/argo-cd
+        release_namespace: argocd
+        create_namespace: true
+        values:
+          server:
+            extraArgs:
+              - --insecure
+      environment:
+        KUBECONFIG: /etc/kubernetes/admin.conf
