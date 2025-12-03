@@ -54,6 +54,12 @@ variable "vm_memory" {
   default     = 4096
 }
 
+variable "vm_disk_storage" {
+  description = "Storage ID for the OS disk"
+  type        = string
+  default     = "local-lvm"
+}
+
 variable "vm_disk_size" {
   description = "Disk size in GB"
   type        = number

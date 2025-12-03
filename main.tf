@@ -19,11 +19,6 @@ provider "proxmox" {
   }
 }
 
-variable "pve_endpoint" {}
-variable "pve_user" {}
-variable "pve_token_id" {}
-variable "pve_token_secret" {}
-variable "ssh_public_key" {}
 
 resource "proxmox_virtual_environment_vm" "k8s_node" {
   name      = var.vm_name

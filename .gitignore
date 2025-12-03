@@ -1,8 +1,10 @@
 # Terraform
 # ローカルの設定ファイルやプラグインキャッシュ
 .terraform/
+.terraform.lock.hcl
 # 状態管理ファイル
 *.tfstate
+*.tfstate.backup
 # 変数ファイル
 *.tfvars
 *.tfvars.json
