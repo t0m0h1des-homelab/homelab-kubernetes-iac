@@ -1,0 +1,18 @@
+# Proxmox API Endpoint (Note: No 'api2/json' suffix required for bpg provider)
+pve_endpoint = "https://192.168.1.33:8006/"
+
+# Auth Configuration
+pve_user         = "terraform-admin@pve"
+pve_token_id     = "tf-token"
+pve_token_secret = "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
+
+# Access Configuration
+ssh_public_key   = "ssh-ed25519 AAAA..."
+
+# VM Customization (Optional overrides)
+# vm_name         = "k8s-node-01"
+# target_node     = "pve"
+# vm_cpu_cores    = 4
+# vm_memory       = 8192
+# vm_ipv4_address = "192.168.1.50/24"
+# vm_gateway      = "192.168.1.1"

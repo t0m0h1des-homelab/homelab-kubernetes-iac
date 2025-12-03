@@ -1,0 +1,6 @@
+[k8s_nodes]
+# ここにTerraformで作成されたVMのIPアドレスを記述してください
+# 例:
+# 192.168.0.100 ansible_user=root
+# ssh private keyを設定する場合は下記
+# 192.168.0.44 ansible_user=root ansible_ssh_private_key_file=~/.ssh/あなたの秘密鍵ファイル名

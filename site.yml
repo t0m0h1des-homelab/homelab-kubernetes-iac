@@ -1,0 +1,182 @@
+- name: Build Single Node Kubernetes Cluster on Fedora
+  hosts: k8s_nodes
+  become: true
+  vars:
+    k8s_version: "1.32"
+    k8s_patch_version: "1.32.0"
+    pod_subnet: "10.244.0.0/16"
+
+  tasks:
+    - name: Disable Swap (runtime)
+      ansible.builtin.command: swapoff -a
+      changed_when: false
+
+    - name: Disable Swap (permanent in fstab)
+      ansible.builtin.replace:
+        path: /etc/fstab
+        regexp: '^([^#].*swap.*)$'
+        replace: '# \1'
+
+    - name: Remove zram packages (Fedora specific)
+      ansible.builtin.dnf:
+        name:
+          - zram-free-utils
+          - zram-generator-defaults
+        state: absent
+
+    - name: Load Kernel Modules
+      community.general.modprobe:
+        name: "{{ item }}"
+        state: present
+      loop:
+        - overlay
+        - br_netfilter
+
+    - name: Persist Kernel Modules
+      ansible.builtin.copy:
+        dest: /etc/modules-load.d/k8s.conf
+        content: |
+          overlay
+          br_netfilter
+
+    - name: Configure Sysctl
+      ansible.posix.sysctl:
+        name: "{{ item.key }}"
+        value: "{{ item.value }}"
+        sysctl_set: yes
+        state: present
+        reload: yes
+      loop:
+        - { key: 'net.bridge.bridge-nf-call-iptables', value: '1' }
+        - { key: 'net.bridge.bridge-nf-call-ip6tables', value: '1' }
+        - { key: 'net.ipv4.ip_forward', value: '1' }
+
+    - name: Set SELinux to Permissive
+      ansible.posix.selinux:
+        policy: targeted
+        state: permissive
+
+    - name: Install firewalld packages
+      ansible.builtin.dnf:
+        name:
+          - firewalld
+          - python3-firewall
+        state: present
+
+    - name: Ensure Firewalld is running
+      ansible.builtin.systemd:
+        name: firewalld
+        enabled: yes
+        state: started
+
+    - name: Fix broken default zone (Force set to public)
+      ansible.builtin.command: firewall-cmd --set-default-zone=public
+      changed_when: false
+
+    - name: Configure Firewalld Ports
+      ansible.posix.firewalld:
+        zone: public
+        port: "{{ item }}"
+        permanent: yes
+        state: enabled
+        immediate: yes
+      loop:
+        - 6443/tcp
+        - 10250/tcp
+        - 2379-2380/tcp
+        - 179/tcp
+        - 4789/udp
+
+    - name: Install CRI-O
+      ansible.builtin.dnf:
+        name: cri-o
+        state: present
+
+    - name: Enable CRI-O
+      ansible.builtin.systemd:
+        name: crio
+        enabled: yes
+        state: started
+
+    - name: Add Kubernetes Repo
+      ansible.builtin.yum_repository:
+        name: kubernetes
+        description: Kubernetes
+        baseurl: "https://pkgs.k8s.io/core:/stable:/v{{ k8s_version }}/rpm/"
+        gpgcheck: yes
+        gpgkey: "https://pkgs.k8s.io/core:/stable:/v{{ k8s_version }}/rpm/repodata/repomd.xml.key"
+        enabled: yes
+
+    - name: Install Kube tools
+      ansible.builtin.dnf:
+        name:
+          - "kubelet"
+          - "kubeadm"
+          - "kubectl"
+        state: present
+
+    - name: Enable Kubelet
+      ansible.builtin.systemd:
+        name: kubelet
+        enabled: yes
+
+    - name: Check if cluster is already initialized
+      ansible.builtin.stat:
+        path: /etc/kubernetes/admin.conf
+      register: kube_conf
+
+    - name: Generate kubeadm config
+      ansible.builtin.copy:
+        dest: /root/kubeadm-config.yaml
+        content: |
+          apiVersion: kubeadm.k8s.io/v1beta4
+          kind: InitConfiguration
+          nodeRegistration:
+            criSocket: "unix:///var/run/crio/crio.sock"
+          ---
+          apiVersion: kubeadm.k8s.io/v1beta4
+          kind: ClusterConfiguration
+          kubernetesVersion: "v{{ k8s_patch_version }}"
+          networking:
+            podSubnet: "{{ pod_subnet }}"
+          ---
+          apiVersion: kubelet.config.k8s.io/v1beta1
+          kind: KubeletConfiguration
+          cgroupDriver: "systemd"
+      when: not kube_conf.stat.exists
+
+    - name: Initialize Kubernetes Cluster
+      ansible.builtin.command: kubeadm init --config /root/kubeadm-config.yaml
+      when: not kube_conf.stat.exists
+      register: kubeadm_init
+
+    - name: Setup kubeconfig for root
+      ansible.builtin.shell: |
+        mkdir -p $HOME/.kube
+        cp -f /etc/kubernetes/admin.conf $HOME/.kube/config
+        chown $(id -u):$(id -g) $HOME/.kube/config
+
+    - name: Install Calico Operator
+      ansible.builtin.command: kubectl create -f https://raw.githubusercontent.com/projectcalico/calico/v3.29.1/manifests/tigera-operator.yaml
+      ignore_errors: true
+
+    - name: Download Calico Custom Resources
+      ansible.builtin.get_url:
+        url: https://raw.githubusercontent.com/projectcalico/calico/v3.29.1/manifests/custom-resources.yaml
+        dest: /root/custom-resources.yaml
+
+    - name: Update CIDR in Calico config
+      ansible.builtin.replace:
+        path: /root/custom-resources.yaml
+        regexp: '192.168.0.0/16'
+        replace: "{{ pod_subnet }}"
+
+    - name: Apply Calico Custom Resources
+      ansible.builtin.command: kubectl apply -f /root/custom-resources.yaml
+
+    - name: Remove Taint for Single Node
+      ansible.builtin.command: kubectl taint nodes --all node-role.kubernetes.io/control-plane-
+      register: taint_result
+      failed_when:
+        - "'not found' not in taint_result.stderr"
+        - "taint_result.rc != 0"

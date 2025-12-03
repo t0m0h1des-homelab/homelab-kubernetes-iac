@@ -1,0 +1,24 @@
+# Terraform
+# ローカルの設定ファイルやプラグインキャッシュ
+.terraform/
+# 状態管理ファイル
+*.tfstate
+# 変数ファイル
+*.tfvars
+*.tfvars.json
+
+# Ansible
+# Inventory
+inventory.ini
+# リトライファイル
+*.retry
+
+# Nix & Direnv
+# direnvが生成する環境キャッシュ
+.direnv/
+
+# OS & Editors
+.DS_Store
+.vscode/
+.idea/
+*.swp
