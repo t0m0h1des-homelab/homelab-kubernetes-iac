@@ -9,16 +9,62 @@ terraform {
 
 provider "proxmox" {
   endpoint = var.pve_endpoint
-
   api_token = "${var.pve_user}!${var.pve_token_id}=${var.pve_token_secret}"
-
   insecure = true
-
   ssh {
     agent = true
   }
 }
 
+resource "proxmox_virtual_environment_vm" "router" {
+  name      = var.router_name
+  node_name = var.target_node
+
+  clone {
+    vm_id = var.template_id
+  }
+
+  agent { enabled = true }
+
+  cpu {
+    cores = 1
+    type  = "host"
+  }
+
+  memory {
+    dedicated = 512
+  }
+
+  disk {
+    datastore_id = var.vm_disk_storage
+    interface    = "scsi0"
+    size         = 10
+    file_format  = "raw"
+  }
+
+  initialization {
+    # WAN側のIP設定 (家のLANにつながる方)
+    ip_config {
+      ipv4 {
+        address = var.router_wan_ip
+        gateway = var.physical_gateway
+      }
+    }
+
+    user_account {
+      username = "root"
+      keys     = [var.ssh_public_key]
+    }
+  }
+
+  network_device {
+    bridge = "vmbr0"
+  }
+
+  network_device {
+    bridge = "vmbr1"
+  }
+}
 
 resource "proxmox_virtual_environment_vm" "k8s_node" {
   name      = var.vm_name
@@ -28,9 +74,7 @@ resource "proxmox_virtual_environment_vm" "k8s_node" {
     vm_id = var.template_id
   }
 
-  agent {
-    enabled = true
-  }
+  agent { enabled = true }
 
   cpu {
     cores = var.vm_cpu_cores
@@ -49,6 +93,10 @@ resource "proxmox_virtual_environment_vm" "k8s_node" {
   }
 
   initialization {
+    dns {
+      servers = ["8.8.8.8", "1.1.1.1"]
+    }
+
     ip_config {
       ipv4 {
         address = var.vm_ipv4_address
@@ -63,6 +111,6 @@ resource "proxmox_virtual_environment_vm" "k8s_node" {
   }
 
   network_device {
-    bridge = var.vm_network_bridge
+    bridge = "vmbr1"
   }
 }

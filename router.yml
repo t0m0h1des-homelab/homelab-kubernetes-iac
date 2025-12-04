@@ -1,0 +1,78 @@
+---
+- name: Configure Virtual Router (Fedora)
+  hosts: routers
+  become: true
+
+  tasks:
+    - name: Ensure NetworkManager is running
+      ansible.builtin.systemd:
+        name: NetworkManager
+        state: started
+        enabled: yes
+
+    - name: Install firewalld
+      ansible.builtin.dnf:
+        name: firewalld
+        state: present
+
+    - name: Ensure Firewalld is running
+      ansible.builtin.systemd:
+        name: firewalld
+        state: started
+        enabled: yes
+
+    - name: Force WAN interface to external zone (Direct Device Modify)
+      ansible.builtin.command:
+        cmd: "nmcli device modify {{ wan_interface | default('eth0') }} connection.zone external"
+      changed_when: false
+      ignore_errors: true
+
+    - name: Configure LAN interface IP and Zone
+      community.general.nmcli:
+        conn_name: "lan-internal"
+        ifname: "{{ lan_interface | default('ens19') }}"
+        type: ethernet
+        ip4: "{{ lan_ip | default('10.0.0.1/24') }}"
+        method4: manual
+        zone: internal
+        state: present
+
+    - name: Force activate LAN profile
+      ansible.builtin.command:
+        cmd: "nmcli connection up lan-internal"
+      changed_when: false
+
+    - name: Enable IPv4 forwarding
+      ansible.posix.sysctl:
+        name: net.ipv4.ip_forward
+        value: '1'
+        sysctl_set: yes
+        state: present
+        reload: yes
+
+    - name: Enable Masquerading on External Zone (NAT)
+      ansible.posix.firewalld:
+        zone: external
+        masquerade: yes
+        permanent: yes
+        state: enabled
+        immediate: yes
+
+    - name: Allow traffic from Internal to External
+      ansible.posix.firewalld:
+        zone: internal
+        target: ACCEPT
+        permanent: yes
+        state: enabled
+
+    - name: Trust Home LAN traffic
+      ansible.posix.firewalld:
+        zone: trusted
+        source: "{{ home_network | default('192.168.0.0/24') }}"
+        permanent: yes
+        state: enabled
+        immediate: yes
+
+    - name: Reload Firewalld to apply changes
+      ansible.builtin.command: firewall-cmd --reload
+      changed_when: false

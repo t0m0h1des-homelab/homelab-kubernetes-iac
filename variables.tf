@@ -66,20 +66,38 @@ variable "vm_disk_size" {
   default     = 20
 }
 
-variable "vm_network_bridge" {
-  description = "Network bridge interface"
+variable "router_name" {
+  description = "Name of the Router VM"
   type        = string
-  default     = "vmbr0"
+  default     = "v-router"
+}
+
+variable "router_wan_ip" {
+  description = "Router WAN IP (Home LAN side)"
+  type        = string
+  default     = "192.168.1.2/24"
+}
+
+variable "router_lan_ip" {
+  description = "Router LAN IP (Internal side)"
+  type        = string
+  default     = "10.0.0.1/24"
 }
 
 variable "vm_ipv4_address" {
   description = "Static IPv4 address in CIDR notation"
   type        = string
-  default     = "192.168.0.44/24"
+  default     = "10.0.0.10/24"
 }
 
 variable "vm_gateway" {
-  description = "Gateway IP address"
+  description = "Gateway IP address (Internal Router IP)"
   type        = string
-  default     = "192.168.0.1"
+  default     = "10.0.0.1"
+}
+
+variable "physical_gateway" {
+  description = "Gateway IP of the physical home router"
+  type        = string
+  default     = "192.168.1.1"
 }

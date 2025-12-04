@@ -9,10 +9,16 @@ pve_token_secret = "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
 # Access Configuration
 ssh_public_key   = "ssh-ed25519 AAAA..."
 
+# Physical Router Configuration
+physical_gateway = "192.168.1.1"
+
+# Virtual Router Configuration
+router_wan_ip    = "192.168.1.2/24"
+
 # VM Customization (Optional overrides)
 # vm_name         = "k8s-node-01"
 # target_node     = "pve"
 # vm_cpu_cores    = 4
 # vm_memory       = 8192
-# vm_ipv4_address = "192.168.1.50/24"
-# vm_gateway      = "192.168.1.1"
+# vm_ipv4_address  = "10.0.0.10/24"
+# vm_gateway       = "10.0.0.1"
