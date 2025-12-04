@@ -1,5 +1,5 @@
 {
-  description = "C1 K8s IaC Environment";
+  description = "K8s IaC Environment";
 
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
@@ -22,6 +22,8 @@
           kubectl
           terraform
         ];
+
+        ANSIBLE_HOST_KEY_CHECKING = "False";
 
         shellHook = ''
           echo "🚀 Ansible & Terraform Environment Loaded!"
