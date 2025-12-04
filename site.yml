@@ -227,7 +227,7 @@
             namespace: metallb-system
           spec:
             addresses:
-            - 10.0.0.100-10.0.0.200
+            - {{ metallb_ip_range | default('10.0.0.100-10.0.0.200') }}
           ---
           apiVersion: metallb.io/v1beta1
           kind: L2Advertisement
@@ -240,5 +240,24 @@
 
     - name: Apply MetalLB Configuration
       ansible.builtin.command: kubectl apply -f /root/metallb-config.yaml
+      environment:
+        KUBECONFIG: /etc/kubernetes/admin.conf
+
+    - name: Add Ingress NGINX Helm Repo
+      kubernetes.core.helm_repository:
+        name: ingress-nginx
+        repo_url: "https://kubernetes.github.io/ingress-nginx"
+
+    - name: Install Ingress NGINX via Helm
+      kubernetes.core.helm:
+        name: ingress-nginx
+        chart_ref: ingress-nginx/ingress-nginx
+        release_namespace: ingress-nginx
+        create_namespace: true
+        values:
+          controller:
+            service:
+              type: LoadBalancer
+            watchIngressWithoutClass: true
       environment:
         KUBECONFIG: /etc/kubernetes/admin.conf

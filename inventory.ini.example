@@ -1,6 +1,6 @@
 [routers]
-192.168.1.2 ansible_user=root lan_ip=10.0.0.1/24 home_network=192.168.1.0/24 lan_interface=ens19 ansible_ssh_private_key_file=~/.ssh/id_rsa
+192.168.1.2 ansible_user=root lan_ip=10.0.0.1/24 lan_interface=ens19 wan_interface=eth0 home_network=192.168.1.0/24 k8s_node_ip=10.0.0.10 metallb_vip_route=10.0.0.100/32 ansible_ssh_private_key_file=~/.ssh/id_rsa
 
 [k8s_nodes]
-10.0.0.10 ansible_user=root ansible_ssh_private_key_file=~/.ssh/id_rsa
+10.0.0.10 ansible_user=root ansible_ssh_private_key_file=~/.ssh/id_rsa metallb_ip_range=10.0.0.100-10.0.0.200
 
