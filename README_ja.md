@@ -36,8 +36,8 @@ graph TD
     end
 
     DevEnv -->|Ansible| Router
-    DevEnv -->|Ansible (via Router)| K8s
-````
+    DevEnv -->|Ansible via Router| K8s
+```
 
 ## 🛠️ 技術スタックと選定理由
 
