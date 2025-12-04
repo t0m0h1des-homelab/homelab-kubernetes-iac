@@ -73,6 +73,19 @@
         state: enabled
         immediate: yes
 
+    - name: Add Static Route for MetalLB VIP
+      community.general.nmcli:
+        conn_name: "lan-internal"
+        type: ethernet
+        routes4:
+          - 10.0.0.100/32 10.0.0.10
+        state: present
+
+    - name: Reactivate LAN profile to apply routes
+      ansible.builtin.command:
+        cmd: "nmcli connection up lan-internal"
+      changed_when: false
+
     - name: Reload Firewalld to apply changes
       ansible.builtin.command: firewall-cmd --reload
       changed_when: false
