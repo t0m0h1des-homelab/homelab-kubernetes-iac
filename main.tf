@@ -27,12 +27,12 @@ resource "proxmox_virtual_environment_vm" "router" {
   agent { enabled = true }
 
   cpu {
-    cores = 1
+    cores = var.router_cpu_cores
     type  = "host"
   }
 
   memory {
-    dedicated = 512
+    dedicated = var.router_memory
   }
 
   disk {
@@ -43,7 +43,6 @@ resource "proxmox_virtual_environment_vm" "router" {
   }
 
   initialization {
-    # WAN側のIP設定 (家のLANにつながる方)
     ip_config {
       ipv4 {
         address = var.router_wan_ip

@@ -16,9 +16,12 @@ physical_gateway = "192.168.1.1"
 router_wan_ip    = "192.168.1.2/24"
 
 # VM Customization (Optional overrides)
-# vm_name         = "k8s-node-01"
-# target_node     = "pve"
-# vm_cpu_cores    = 4
-# vm_memory       = 8192
+# vm_name          = "k8s-node-01"
+# target_node      = "pve"
+# m_cpu_cores      = 12
+# vm_memory        = 20480
+# router_cpu_cores = 2
+# router_memory    = 4096
 # vm_ipv4_address  = "10.0.0.10/24"
 # vm_gateway       = "10.0.0.1"
+

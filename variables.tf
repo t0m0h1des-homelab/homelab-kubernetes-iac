@@ -45,13 +45,13 @@ variable "template_id" {
 variable "vm_cpu_cores" {
   description = "Number of CPU cores"
   type        = number
-  default     = 2
+  default     = 12
 }
 
 variable "vm_memory" {
   description = "Memory size in MB"
   type        = number
-  default     = 4096
+  default     = 20480
 }
 
 variable "vm_disk_storage" {
@@ -82,6 +82,18 @@ variable "router_lan_ip" {
   description = "Router LAN IP (Internal side)"
   type        = string
   default     = "10.0.0.1/24"
+}
+
+variable "router_cpu_cores" {
+  description = "Number of CPU cores for Router"
+  type        = number
+  default     = 2
+}
+
+variable "router_memory" {
+  description = "Memory size in MB for Router"
+  type        = number
+  default     = 4096
 }
 
 variable "vm_ipv4_address" {

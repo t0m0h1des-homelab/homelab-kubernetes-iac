@@ -6,7 +6,39 @@
     k8s_patch_version: "1.32.0"
     pod_subnet: "10.244.0.0/16"
 
+  pre_tasks:
+    - name: Wait for SSH connection to be available
+      ansible.builtin.wait_for_connection:
+        delay: 5
+        timeout: 300
+
+    - name: Wait for Cloud-Init to complete (File check)
+      ansible.builtin.wait_for:
+        path: /var/lib/cloud/instance/boot-finished
+        state: present
+        timeout: 300
+
   tasks:
+    - name: Install ethtool
+      ansible.builtin.dnf:
+        name: ethtool
+        state: present
+
+    - name: Disable TCP segmentation offload to prevent packet drops
+      ansible.builtin.shell: |
+        for iface in $(ls /sys/class/net/ | grep -E '^(eth|ens|enp)'); do
+          ethtool -K $iface tx off sg off tso off gro off gso off || true
+        done
+      changed_when: false
+
+    - name: Configure NetworkManager to ignore Calico interfaces
+      ansible.builtin.copy:
+        dest: /etc/NetworkManager/conf.d/calico.conf
+        content: |
+          [keyfile]
+          unmanaged-devices=interface-name:cali*;interface-name:tunl*;interface-name:vxlan.calico;interface-name:wireguard.cali
+      notify: Reload NetworkManager
+
     - name: Disable Swap (runtime)
       ansible.builtin.command: swapoff -a
       changed_when: false
@@ -87,6 +119,18 @@
         - 179/tcp
         - 4789/udp
 
+    - name: Trust Pod Network (Allow Pod-to-Pod communication)
+      ansible.posix.firewalld:
+        zone: trusted
+        source: "{{ pod_subnet }}"
+        permanent: yes
+        state: enabled
+        immediate: yes
+
+    - name: Reload Firewalld to apply changes
+      ansible.builtin.command: firewall-cmd --reload
+      changed_when: false
+
     - name: Install CRI-O
       ansible.builtin.dnf:
         name: cri-o
@@ -159,22 +203,68 @@
         chown $(id -u):$(id -g) $HOME/.kube/config
 
     - name: Install Calico Operator
-      ansible.builtin.command: kubectl create -f https://raw.githubusercontent.com/projectcalico/calico/v3.29.1/manifests/tigera-operator.yaml
+      ansible.builtin.command: kubectl apply --server-side -f https://raw.githubusercontent.com/projectcalico/calico/v3.29.1/manifests/tigera-operator.yaml
       ignore_errors: true
 
-    - name: Download Calico Custom Resources
-      ansible.builtin.get_url:
-        url: https://raw.githubusercontent.com/projectcalico/calico/v3.29.1/manifests/custom-resources.yaml
+    - name: Create Calico Custom Resources with Interface Config
+      ansible.builtin.copy:
         dest: /root/custom-resources.yaml
-
-    - name: Update CIDR in Calico config
-      ansible.builtin.replace:
-        path: /root/custom-resources.yaml
-        regexp: '192.168.0.0/16'
-        replace: "{{ pod_subnet }}"
+        content: |
+          apiVersion: operator.tigera.io/v1
+          kind: Installation
+          metadata:
+            name: default
+          spec:
+            calicoNetwork:
+              nodeAddressAutodetectionV4:
+                interface: "en.*|eth.*"
+              ipPools:
+              - name: default-ipv4-ippool
+                blockSize: 26
+                cidr: "{{ pod_subnet }}"
+                encapsulation: VXLANCrossSubnet
+                natOutgoing: Enabled
+                nodeSelector: all()
+          ---
+          apiVersion: operator.tigera.io/v1
+          kind: APIServer
+          metadata:
+            name: default
+          spec: {}
 
     - name: Apply Calico Custom Resources
       ansible.builtin.command: kubectl apply -f /root/custom-resources.yaml
+
+    - name: Delete existing cni0 interface to force recreation
+      ansible.builtin.shell: |
+        if ip link show cni0 > /dev/null 2>&1; then
+          ip link delete cni0
+        fi
+      ignore_errors: true
+
+    - name: Restart Calico Pods to apply interface changes
+      ansible.builtin.shell: |
+        kubectl delete pods -n calico-system --all --force --grace-period=0
+      ignore_errors: true
+
+    - name: Wait for Node to be Ready
+      ansible.builtin.command:
+        cmd: kubectl wait --for=condition=Ready node --all --timeout=600s
+      changed_when: false
+
+    - name: Wait for Calico Pods to be Ready
+      ansible.builtin.command:
+        cmd: kubectl wait --for=condition=Ready pods --all -n calico-system --timeout=600s
+      changed_when: false
+      register: calico_wait
+      until: calico_wait.rc == 0
+      retries: 30
+      delay: 10
+
+    - name: Wait for CoreDNS to be Ready
+      ansible.builtin.command:
+        cmd: kubectl wait --for=condition=Ready pods -l k8s-app=kube-dns -n kube-system --timeout=600s
+      changed_when: false
 
     - name: Remove Taint for Single Node
       ansible.builtin.command: kubectl taint nodes --all node-role.kubernetes.io/control-plane-
@@ -198,6 +288,8 @@
           server:
             extraArgs: []
               # - --insecure
+            service:
+              type: LoadBalancer
       environment:
         KUBECONFIG: /etc/kubernetes/admin.conf
 
@@ -213,8 +305,13 @@
         release_namespace: metallb-system
         create_namespace: true
         wait: true
+        timeout: 10m0s
       environment:
         KUBECONFIG: /etc/kubernetes/admin.conf
+
+    - name: Pause for MetalLB Webhook service to be ready
+      ansible.builtin.pause:
+        seconds: 30
 
     - name: Create MetalLB Configuration (IP Pool & L2 Advertisement)
       ansible.builtin.copy:
@@ -261,3 +358,16 @@
             watchIngressWithoutClass: true
       environment:
         KUBECONFIG: /etc/kubernetes/admin.conf
+
+    - name: Apply ArgoCD Bootstrap Application (App of Apps)
+      kubernetes.core.k8s:
+        state: present
+        definition: "{{ lookup('url', 'https://raw.githubusercontent.com/t0m0h1des-homelab/homelab-k8s-apps/main/argocd/bootstrap.yaml', split_lines=False) }}"
+      environment:
+        KUBECONFIG: /etc/kubernetes/admin.conf
+
+  handlers:
+    - name: Reload NetworkManager
+      ansible.builtin.systemd:
+        name: NetworkManager
+        state: reloaded

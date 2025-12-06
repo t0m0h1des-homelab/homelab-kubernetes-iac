@@ -2,7 +2,31 @@
   hosts: routers
   become: true
 
+  pre_tasks:
+    - name: Wait for SSH connection to be available
+      ansible.builtin.wait_for_connection:
+        delay: 5
+        timeout: 300
+
+    - name: Wait for Cloud-Init to complete (File check)
+      ansible.builtin.wait_for:
+        path: /var/lib/cloud/instance/boot-finished
+        state: present
+        timeout: 300
+
   tasks:
+    - name: Install ethtool
+      ansible.builtin.dnf:
+        name: ethtool
+        state: present
+
+    - name: Disable TCP segmentation offload to prevent packet drops
+      ansible.builtin.shell: |
+        for iface in $(ls /sys/class/net/ | grep -E '^(eth|ens|enp)'); do
+          ethtool -K $iface tx off sg off tso off gro off gso off || true
+        done
+      changed_when: false
+
     - name: Ensure NetworkManager is running
       ansible.builtin.systemd:
         name: NetworkManager
