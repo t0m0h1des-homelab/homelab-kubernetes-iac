@@ -37,7 +37,11 @@
         content: |
           [keyfile]
           unmanaged-devices=interface-name:cali*;interface-name:tunl*;interface-name:vxlan.calico;interface-name:wireguard.cali
-      notify: Reload NetworkManager
+
+    - name: Reload NetworkManager IMMEDIATELY
+      ansible.builtin.systemd:
+        name: NetworkManager
+        state: restarted
 
     - name: Disable Swap (runtime)
       ansible.builtin.command: swapoff -a
@@ -171,6 +175,15 @@
         path: /etc/kubernetes/admin.conf
       register: kube_conf
 
+    - name: Pre-flight Cleanup (Clear CNI & Iptables)
+      ansible.builtin.shell: |
+        rm -rf /etc/cni/net.d/*
+        rm -rf /var/lib/cni/*
+        rm -rf /var/lib/calico/*
+        iptables -F && iptables -t nat -F && iptables -t mangle -F && iptables -X || true
+      when: not kube_conf.stat.exists
+      ignore_errors: true
+
     - name: Generate kubeadm config
       ansible.builtin.copy:
         dest: /root/kubeadm-config.yaml
@@ -261,17 +274,17 @@
       retries: 30
       delay: 10
 
-    - name: Wait for CoreDNS to be Ready
-      ansible.builtin.command:
-        cmd: kubectl wait --for=condition=Ready pods -l k8s-app=kube-dns -n kube-system --timeout=600s
-      changed_when: false
-
     - name: Remove Taint for Single Node
       ansible.builtin.command: kubectl taint nodes --all node-role.kubernetes.io/control-plane-
       register: taint_result
       failed_when:
         - "'not found' not in taint_result.stderr"
         - "taint_result.rc != 0"
+
+    - name: Wait for CoreDNS to be Ready
+      ansible.builtin.command:
+        cmd: kubectl wait --for=condition=Ready pods -l k8s-app=kube-dns -n kube-system --timeout=600s
+      changed_when: false
 
     - name: Add ArgoCD Helm Repo
       kubernetes.core.helm_repository:
@@ -287,7 +300,6 @@
         values:
           server:
             extraArgs: []
-              # - --insecure
             service:
               type: LoadBalancer
       environment:
@@ -365,9 +377,3 @@
         definition: "{{ lookup('url', 'https://raw.githubusercontent.com/t0m0h1des-homelab/homelab-k8s-apps/main/argocd/bootstrap.yaml', split_lines=False) }}"
       environment:
         KUBECONFIG: /etc/kubernetes/admin.conf
-
-  handlers:
-    - name: Reload NetworkManager
-      ansible.builtin.systemd:
-        name: NetworkManager
-        state: reloaded
