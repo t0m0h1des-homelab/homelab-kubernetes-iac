@@ -7,18 +7,19 @@
 ![Ansible](https://img.shields.io/badge/Ansible-2.16+-red)
 ![Nix](https://img.shields.io/badge/Nix-Reproducible-blue)
 
-**Proxmox VE 9** 上にKubernetesクラスタをプロビジョニングするための完全な **Infrastructure as Code (IaC)** リポジトリ。
-仮想ルーター（NFV）によるネットワーク分離と、宣言的な構成管理によるモダンな自宅ラボ（Home Lab）構築を実践。
+**Proxmox VE 9** 上に Kubernetes クラスターを構築するための完全な **Infrastructure as Code (IaC)** リポジトリです。
+本プロジェクトは、仮想ルーター (NFV) によるネットワーク分離と宣言的な構成管理を特徴とし、モダンで再現性の高いホームラボインフラストラクチャのアプローチを実証します。
 
-## 🚀 主な特徴
+## 🚀 主な機能
 
-* **再現可能な開発環境:** **Nix & Direnv** を使用して開発ツール（Terraform, Ansible, kubectl）を一元管理。ホストマシンへの手動インストールやバージョン管理の手間を排除。
-* **Network Function Virtualization (NFV):** Fedoraベースの仮想ルーターを展開し、Kubernetesクラスタを内部ネットワークに隔離。NATおよびIPマスカレードによるセキュアな通信経路を確立。
-* **モダンなProxmoxサポート:** **Proxmox VE 9+** に完全対応するため、最新の `bpg/proxmox` プロバイダを採用。
-* **Immutable Infrastructure:** Cloud-Initを通じて **Fedora Cloud Base Images** をデプロイし、常にクリーンで一貫性のあるVMプロビジョニングを保証。
+* **再現性のある環境:** **Nix & Direnv** を使用して開発ツール (Terraform, Ansible, kubectl) を管理します。ホストマシンへの手動インストールやバージョン不整合の問題を排除します。
+* **ネットワーク機能仮想化 (NFV):** Fedora ベースの仮想ルーターを展開し、Kubernetes クラスターを内部ネットワークに分離します。NAT と IP マスカレードを通じて安全な通信を確立します。
+* **堅牢なネットワーク:** VirtIO ドライバーでのパケットドロップを防ぐための最適化設定 (TSO/GSO 無効化) や、Calico CNI との互換性のための NetworkManager 調整を含みます。
+* **モダンな Proxmox サポート:** **bpg/proxmox** プロバイダーを使用し、Proxmox VE 9+ との完全な互換性を提供します。
+* **GitOps 対応:** **ArgoCD** と **MetalLB** を自動的にブートストラップし、即座にアプリケーションデプロイが可能な状態にします。
 * **宣言的な構成管理:**
-    * **Terraform:** VMのライフサイクル（コンピュート、ネットワーク、ストレージ）を管理。
-    * **Ansible:** OS設定、ルーター構築、Kubernetes (Kubeadm) のブートストラップを管理。
+    * **Terraform:** VM のライフサイクル (コンピュート, ネットワーク, ストレージ) をパラメータ化されたリソースサイズで管理します。
+    * **Ansible:** OS 設定、ルーター構築、Kubernetes (Kubeadm) のブートストラップを一貫して管理します。
 
 ## 🏗️ アーキテクチャ
 
@@ -37,18 +38,18 @@ graph TD
 
     DevEnv -->|Ansible| Router
     DevEnv -->|Ansible via Router| K8s
-```
+````
 
 ## 🛠️ 技術スタックと選定理由
 
 | カテゴリ | 技術 | 選定理由 |
 | :--- | :--- | :--- |
-| **開発環境** | **Nix + Direnv** | 異なるマシン間でのツールバージョンの一貫性を保証し、ホストOSを汚さないため。 |
-| **プロビジョニング** | **Terraform** | インフラライフサイクル管理の業界標準。v9互換性のために `bpg/proxmox` を採用。 |
-| **構成管理** | **Ansible** | エージェントレスで軽量。ルーターのネットワーク設定からK8s構築まで一貫して管理可能。 |
-| **ネットワーク** | **Linux Router (NFV)** | 物理ネットワーク構成を変更せず、IaCのみで完結する分離ネットワーク環境（SDN）を構築するため。 |
-| **仮想化基盤** | **Proxmox VE** | 強力で柔軟なオープンソースのType-1ハイパーバイザー。 |
-| **OS** | **Fedora Cloud** | 最新のカーネル機能とSELinux統合が利用でき、モダンなコンテナワークロードに最適。 |
+| **開発環境** | **Nix + Direnv** | 異なるマシン間でのツールバージョンの一貫性を保証し、ホスト OS をクリーンに保つため。 |
+| **プロビジョニング** | **Terraform** | インフラライフサイクル管理の業界標準。v9 互換性のために `bpg/proxmox` を採用。 |
+| **構成管理** | **Ansible** | エージェントレスで軽量。ルーターのネットワーク設定から K8s のブートストラップまでを一貫して管理します。 |
+| **ネットワーク** | **Linux Router (NFV)** | 物理ネットワーク機器の設定を変更することなく、IaC だけで完全に分離されたネットワーク環境 (SDN) を構築するため。 |
+| **仮想化** | **Proxmox VE** | 強力なオープンソースの Type-1 ハイパーバイザー。 |
+| **OS** | **Fedora Cloud** | 最新のカーネル機能と SELinux 統合を提供し、モダンなコンテナワークロードに最適であるため。 |
 
 ## ⚡ クイックスタート
 
@@ -56,28 +57,30 @@ graph TD
 
   * Nix がインストールされていること
   * Direnv がインストールされていること
-  * Proxmox VE 8.x または 9.x 環境があること
+  * Proxmox VE 8.x または 9.x 環境
+  * **ハードウェアリソース:** ホストに十分な RAM があることを確認してください。デフォルト構成では K8s ノードに **20GB RAM** を割り当てます (`terraform.tfvars` で変更可能)。
 
 ### 1\. 開発環境のセットアップ
 
-ディレクトリに移動するだけで、Nixが自動的にTerraformやAnsibleなどのツールをセットアップ。
+ディレクトリに移動するだけで、Nix が Terraform, Ansible などのツールを自動セットアップします。
 
 ```bash
 direnv allow
 ```
 
-### 2\. 認証情報の設定
+### 2\. クレデンシャルとリソースの設定
 
-Exampleファイルをコピーし、Proxmoxの認証情報などを定義。
+サンプルファイルをコピーし、Proxmox の認証情報とリソースサイズを定義します。
 
 ```bash
 cp terraform.tfvars.example terraform.tfvars
-# pve_endpoint, pve_user, token, ssh_key, router_ip などを編集
+# pve_endpoint, pve_user, token, ssh_key などを編集
+# 必要に応じて vm_memory や vm_cpu_cores を調整
 ```
 
 ### 3\. インフラのプロビジョニング (Terraform)
 
-ルーターVMとKubernetesノードVMを作成。
+仮想ルーターと Kubernetes ノードの VM を作成します。
 
 ```bash
 terraform init
@@ -85,32 +88,32 @@ terraform plan
 terraform apply
 ```
 
-### 4\. ネットワークとクラスタの構築 (Ansible)
+### 4\. ネットワークとクラスターの構築 (Ansible)
 
-インベントリファイルを作成し、**ルーター構築 → クラスタ構築** の順で実行。
+インベントリファイルを作成し、**ルーター構築 → クラスター構築** の順に Playbook を実行します。
 
 ```bash
 cp inventory.ini.example inventory.ini
-# ルーターとK8sノードのIPアドレスを記述
+# ルーターと K8s ノードの IP アドレスを編集
 
-# 1. 仮想ルーターのセットアップ (NAT/Firewall有効化)
+# 1. 仮想ルーターのセットアップ (NAT/Firewall 有効化 & パケットドロップ対策)
 ansible-playbook -i inventory.ini router.yml
 
-# 2. Kubernetesクラスタ & ArgoCDの構築
+# 2. Kubernetes クラスター構築 (Kubeadm, Calico, MetalLB, ArgoCD)
 ansible-playbook -i inventory.ini site.yml
 ```
 
 ## 🔜 ロードマップ
 
-  * [x] **ArgoCD** の導入によるGitOpsベースのアプリケーションデプロイ
-  * [ ] **MetalLB** の導入による内部ロードバランシング（Layer 2）
-  * [ ] **Renovate** の導入による依存関係更新の自動化
-  * [ ] **Cloudflare Tunnel** を利用したポート開放不要のセキュアなリモートアクセス
-  * [ ] **Longhorn** または **Rook/Ceph** による分散ブロックストレージとバックアップの実装
-  * [ ] **Prometheus & Grafana** スタックによるクラスタ監視とアラート設定
-  * [ ] **Loki** または **Fluent Bit** によるログ集約基盤の構築
-  * [ ] **Sealed Secrets** または **External Secrets Operator** によるGitOps上の機密情報管理
+  * [x] GitOps ベースのアプリデプロイのための **ArgoCD** 統合
+  * [x] 内部 L2 ロードバランシングのための **MetalLB** 設定
+  * [ ] 自動依存関係更新のための **Renovate** 実装
+  * [ ] ポート開放なしで安全なリモートアクセスを行うための **Cloudflare Tunnel** 統合
+  * [ ] 分散ブロックストレージとバックアップのための **Longhorn** または **Rook/Ceph** デプロイ
+  * [ ] クラスター監視とアラートのための **Prometheus & Grafana** スタック
+  * [ ] ログ集約のための **Loki** または **Fluent Bit**
+  * [ ] GitOps でシークレットを管理するための **Sealed Secrets** または **External Secrets Operator**
 
 ## 📝 ライセンス
 
-This project is licensed under the MIT License.
+本プロジェクトは MIT ライセンスの下で公開されています。
